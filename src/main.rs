@@ -37,10 +37,10 @@ struct Kubetail{
 async fn main() -> anyhow::Result<()>{
     let args = Kubetail::parse();
     
-    let kube_config = kube::config::KubeConfigOptions{cluster:Some("CainaticsDev".to_owned()),..KubeConfigOptions::default()};
-    let config = kube::Config::from_kubeconfig(&kube_config).await?;
-    let client:  Client = Client::try_from(config)?;
-    //let client: Client = Client::try_default().await.expect("Expected a valid KUBECONFIG env variable");
+    // let kube_config = kube::config::KubeConfigOptions{cluster:Some("CainaticsDev".to_owned()),..KubeConfigOptions::default()};
+    // let config = kube::Config::from_kubeconfig(&kube_config).await?;
+    // let client:  Client = Client::try_from(config)?;
+    let client: Client = Client::try_default().await.expect("Expected a valid KUBECONFIG env variable");
     let mut namespace = "default";
     let mut previous = false;
     let mut pretty = false;
@@ -53,14 +53,16 @@ async fn main() -> anyhow::Result<()>{
     let mut since_time: Option<i64> = Some(20);
 
     if args.namespace != "default" {
+        
         namespace = &args.namespace;
     }
     if args.name != ""{
+        
         app_name = &args.name;
     }
-    if args.since != 20 {
-        since_time = Some(args.since as i64);
-    }
+    // if args.since != 20 {
+    //     since_time = Some(args.since as i64);
+    // }
     if args.label != ""{
         lp = ListParams::default().labels(&args.label);
     }
@@ -75,7 +77,6 @@ async fn main() -> anyhow::Result<()>{
     }
     if args.tail != 0 {
         tail = Some(args.tail);
-        println!("Tail: {:?}", tail);
     }
     // if args.limit_bytes != -1{
     //     limit_bytes = Some(args.limit_bytes);
@@ -106,8 +107,9 @@ async fn main() -> anyhow::Result<()>{
     }else{
         for p in pods_api.list(&lp).await {
             for pod in p.items{
+                
                 if pod.name_any().contains(app_name){
-                    
+                    println!("pod name matched");
                     let mut rng = rand::thread_rng();
                     let mut owned_string: String = "Pod Name: ".to_owned();
                     let pod_name:  &str = &pod.name_any()[..];
@@ -116,7 +118,8 @@ async fn main() -> anyhow::Result<()>{
                     println!("{}", owned_string.truecolor(rng.gen_range(0..255), rng.gen_range(0..255), rng.gen_range(0..255)));
                     
                     let containers = pod.spec.unwrap().containers;
-                    let default_container = &containers[1];
+                    let default_container = &containers[0];
+                    println!("default container: {:?}", default_container.name);
         
                     
                     if containers.len() >= 1 || args.container != ""{
@@ -131,7 +134,7 @@ async fn main() -> anyhow::Result<()>{
                                     let mut logs = pods_api.log_stream(pod_name, &LogParams{
                                         follow: follow_log,
                                         container: container_name.to_owned(),
-                                        since_seconds:since_time,
+                                        //since_seconds:since_time,
                                         pretty: pretty,
                                         previous: previous,
                                         ..LogParams::default()
@@ -143,7 +146,7 @@ async fn main() -> anyhow::Result<()>{
                                     let mut logs = pods_api.log_stream(pod_name, &LogParams{
                                         follow: follow_log,
                                         container: container_name.to_owned(),
-                                        since_seconds:since_time,
+                                        //since_seconds:since_time,
                                         pretty: pretty,
                                         previous: previous,
                                         // limit_bytes: limit_bytes,
@@ -158,24 +161,36 @@ async fn main() -> anyhow::Result<()>{
                             }
                             else{
                                 if args.tail == 0{
+                                    println!("here");
                                     let mut logs = pods_api.log_stream(pod_name, &LogParams{
                                         follow: follow_log,
-                                        container: Some(default_container.name.to_owned()),
-                                        since_seconds:since_time,
                                         pretty: pretty,
                                         previous: previous,
+                                        container: Some(default_container.name.to_owned()),
                                         ..LogParams::default()
                                     }).await?;
                                     println!("here");
                                     while let Some(line) = logs.try_next().await? {
                                         println!("Logs: {}", String::from_utf8_lossy(&line).truecolor(rng.gen_range(0..255), rng.gen_range(0..255), rng.gen_range(0..255)));
                                     }
+                                    // let mut logs = pods_api.log_stream(pod_name, &LogParams{
+                                    //     follow: follow_log,
+                                    //     container: Some(default_container.name.to_owned()),
+                                    //     since_seconds:since_time,
+                                    //     pretty: pretty,
+                                    //     previous: previous,
+                                    //     ..LogParams::default()
+                                    // }).await?;
+                                    // println!("here");
+                                    // while let Some(line) = logs.try_next().await? {
+                                    //     println!("Logs: {}", String::from_utf8_lossy(&line).truecolor(rng.gen_range(0..255), rng.gen_range(0..255), rng.gen_range(0..255)));
+                                    // }
 
                                 }else{
                                     let mut logs = pods_api.log_stream(pod_name, &LogParams{
                                         follow: follow_log,
                                         container: Some(default_container.name.to_owned()),
-                                        since_seconds:since_time,
+                                        //since_seconds:since_time,
                                         pretty: pretty,
                                         previous: previous,
                                         tail_lines: tail,
@@ -202,7 +217,7 @@ async fn main() -> anyhow::Result<()>{
                         if args.tail == 0{
                             let mut logs = pods_api.log_stream(pod_name, &LogParams{
                                 follow: follow_log,
-                                since_seconds:since_time,
+                                //since_seconds:since_time,
                                 pretty: pretty,
                                 previous: previous,
                                 ..LogParams::default()
@@ -213,12 +228,13 @@ async fn main() -> anyhow::Result<()>{
                         }else{
                             let mut logs = pods_api.log_stream(pod_name, &LogParams{
                                 follow: follow_log,
-                                since_seconds:since_time,
+                                //since_seconds:since_time,
                                 pretty: pretty,
                                 previous: previous, 
                                 tail_lines: tail,
                                 ..LogParams::default()
                             }).await?;
+                            println!("here with tail");
                             while let Some(line) = logs.try_next().await? {
                                 println!("Logs: {}", String::from_utf8_lossy(&line).truecolor(rng.gen_range(0..255), rng.gen_range(0..255), rng.gen_range(0..255)));
                             }
